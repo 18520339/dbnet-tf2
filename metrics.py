@@ -39,7 +39,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
             self.images_and_sizes.append((image, raw_image.shape[:2]))
         
         
-    def on_begin(self, epoch, logs=None): 
+    def on_begin(self, arg1, arg2=None): 
         self.pred_boxes = []
         self.mean_precision = 0
         self.mean_recall = 0
@@ -48,7 +48,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         self.epoch_pred_count = 0
         
 
-    def on_end(self, epoch, logs=None):
+    def on_end(self, arg1, arg2=None):
         for image, true_size in self.progressbar(self.images_and_sizes, unit='image', desc='Predicting bounding boxes'):
             batch_boxes, batch_scores = self.model.predict(tf.expand_dims(image, 0), tf.expand_dims(true_size, 0))
             self.pred_boxes.append([
@@ -75,7 +75,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         if self.mean_precision + self.mean_recall == 0: self.mean_fmeasure = 0
         else: self.mean_fmeasure = 2 * self.mean_precision * self.mean_recall / (self.mean_precision + self.mean_recall)
         
-        print(f'Evaluation metrics for epoch {epoch + 1} '
+        print(f'Average metrics for all evaluation images '
               f'- precision: {self.mean_precision:.4f} '
               f'- recall: {self.mean_recall:.4f} '
               f'- fmeasure: {self.mean_fmeasure:.4f}')
