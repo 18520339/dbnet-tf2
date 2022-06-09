@@ -40,7 +40,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         
         
     def on_begin(self, arg1, arg2=None): 
-        self.pred_boxes = []
+        self.all_pred_boxes = []
         self.mean_precision = 0
         self.mean_recall = 0
         self.mean_fmeasure = 0
@@ -50,14 +50,14 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
 
     def on_end(self, arg1, arg2=None):
         for image, true_size in self.progressbar(self.images_and_sizes, unit='image', desc='Predicting bounding boxes'):
-            batch_boxes, batch_scores = self.model.predict(tf.expand_dims(image, 0), tf.expand_dims(true_size, 0))
-            self.pred_boxes.append([
+            batch_boxes, batch_scores = self.model.predict(tf.expand_dims(image, 0), [true_size])
+            self.all_pred_boxes.append([
                 box for idx, box in enumerate(batch_boxes[0]) # Remove batch dimension
                 if batch_scores[0][idx] > self.min_box_score
             ])
 
         iterator = self.progressbar(
-            zip(self.true_annotations, self.pred_boxes), 
+            zip(self.true_annotations, self.all_pred_boxes), 
             total = len(self.true_annotations), 
             unit = 'image',
             desc = 'Calculating TedEval metric',
@@ -107,15 +107,42 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
             - The threshold of both area recall and area precision are set to 0.4.
             - Multiline is identified and rejected when |min(theta, 180 - theta)| > 45
             '''
-            self.matching_policy = MatchingPolicy(
+            matching_policy = MatchingPolicy(
                 true_polys, pred_polys, true_ignore_idxs, pred_ignore_idxs, 
                 precision_mat, recall_mat, self.area_precision_constraint, self.area_recall_constraint
             )
+            pairs = []
+        
+            # Find many-to-one matches
+            for pred_idx in range(len(pred_polys)):
+                if pred_idx not in pred_ignore_idxs:
+                    is_match, true_matches = matching_policy.many2one(pred_idx)
+                    if is_match: pairs.append({'true': true_matches, 'pred': [pred_idx]})
 
+            # Find one-to-one matches
+            for true_idx, true_poly in enumerate(true_polys):
+                for pred_idx, pred_poly in enumerate(pred_polys):
+                    if true_idx not in true_ignore_idxs and \
+                        pred_idx not in pred_ignore_idxs and \
+                        matching_policy.one2one(true_idx, pred_idx):
+                        norm_dist = BoxPointsHandler.get_point_distance(
+                            true_poly.centroid.coords[0], 
+                            pred_poly.centroid.coords[0]
+                        ) / (
+                            BoxPointsHandler.get_diag(true_boxes[true_idx]) + 
+                            BoxPointsHandler.get_diag(pred_boxes[pred_idx])
+                        ) * 2.0
+                        if norm_dist < 1: pairs.append({'true': [true_idx], 'pred': [pred_idx]})
+                        
+            # Find one-to-many matches
+            for true_idx in range(len(true_polys)):
+                if true_idx not in true_ignore_idxs:
+                    is_match, pred_matches = matching_policy.one2many(true_idx)
+                    if is_match: pairs.append({'true': [true_idx], 'pred': pred_matches})
+            
             # Fill the match matrix
             match_mat = np.zeros([true_polys_length, pred_polys_length])
-            for pair in self._apply_matching_policy(true_polys, pred_polys, true_ignore_idxs, pred_ignore_idxs): 
-                match_mat[pair['true'], pair['pred']] = 1
+            for pair in pairs: match_mat[pair['true'], pair['pred']] = 1
             
             # Fill the character matrix
             for pred_idx in np.where(match_mat.sum(axis=0) > 0)[0]:
@@ -130,8 +157,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
                 match_mat, true_pccs_mat, true_boxes_pccs, 
                 true_polys_length, pred_polys_length
             )
-        
-        self.matching_policy = None
+
         true_care_count = len(true_polys) - len(true_ignore_idxs)
         pred_care_count = len(pred_polys) - len(pred_ignore_idxs)
         return precision, recall, true_care_count, pred_care_count
@@ -178,38 +204,6 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
                 if recall_mat[ignore_idx, pred_idx] > 0: 
                     pred_polys[pred_idx] -= true_polys[ignore_idx]
         return pred_ignore_idxs, pred_polys
-    
-    
-    def _apply_matching_policy(self, true_polys, pred_polys, true_ignore_idxs, pred_ignore_idxs):
-        pairs = []
-        
-        # Find many-to-one matches
-        for pred_idx in range(len(pred_polys)):
-            if pred_idx not in pred_ignore_idxs:
-                is_match, true_matches = self.matching_policy.many2one(pred_idx)
-                if is_match: pairs.append({'true': true_matches, 'pred': [pred_idx]})
-
-        # Find one-to-one matches
-        for true_idx, true_poly in enumerate(true_polys):
-            for pred_idx, pred_poly in enumerate(pred_polys):
-                if true_idx not in true_ignore_idxs and \
-                    pred_idx not in pred_ignore_idxs and \
-                    self.matching_policy.one2one(true_idx, pred_idx):
-                    norm_dist = BoxPointsHandler.get_point_distance(
-                        true_poly.centroid.coords[0], 
-                        pred_poly.centroid.coords[0]
-                    ) / (
-                        BoxPointsHandler.get_diag(true_boxes[true_idx]) + 
-                        BoxPointsHandler.get_diag(pred_boxes[pred_idx])
-                    ) * 2.0
-                    if norm_dist < 1: pairs.append({'true': [true_idx], 'pred': [pred_idx]})
-                    
-        # Find one-to-many matches
-        for true_idx in range(len(true_polys)):
-            if true_idx not in true_ignore_idxs:
-                is_match, pred_matches = self.matching_policy.one2many(true_idx)
-                if is_match: pairs.append({'true': [true_idx], 'pred': pred_matches})
-        return pairs
     
     
     def _compute_precision_recall(self, match_mat, true_pccs_mat, true_boxes_pccs, true_length, pred_length):

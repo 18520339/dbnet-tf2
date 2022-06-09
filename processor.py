@@ -62,7 +62,7 @@ class PostProcessor:
     def bitmap2quads(self, pred, bitmap, original_width, original_height):
         assert len(bitmap.shape) == 2
         boxes, scores = [], []
-        height, width = bitmap.shape # cv2.imread().shape output in (height, width) => also for the model output
+        height, width = bitmap.shape
         contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         for contour in contours[:self.max_candidates]:
@@ -73,7 +73,7 @@ class PostProcessor:
             score = self.box_score_fast(pred, points.reshape(-1, 2))
             if self.min_box_score > score: continue
 
-            box = self.unclip(points, unclip_ratio=self.unclip_ratio)
+            box = self.unclip(points)
             box, sside = self.get_mini_boxes(box.reshape(-1, 1, 2))
             if sside < self.min_size + 2: continue
             
@@ -85,9 +85,9 @@ class PostProcessor:
         return boxes, scores
 
 
-    def unclip(self, box, unclip_ratio=1.5):
+    def unclip(self, box):
         poly = Polygon(box)
-        distance = poly.area * unclip_ratio / poly.length
+        distance = poly.area * self.unclip_ratio / poly.length
         offset = pyclipper.PyclipperOffset()
         offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
         expanded = np.array(offset.Execute(distance))
