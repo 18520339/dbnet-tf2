@@ -192,7 +192,7 @@ class DataGenerator(tf.keras.utils.Sequence):
         
 
     def __len__(self):
-        return np.ceil(self.size / self.batch_size).astype(int)
+        return np.ceil(self.size / self.batch_size).astype(np.int32)
 
 
     def on_epoch_end(self):

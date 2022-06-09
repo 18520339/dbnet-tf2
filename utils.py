@@ -30,10 +30,10 @@ class BoxPointsHandler: # Static class
 
     @staticmethod
     def get_extremum_points(box_points, image_height, image_width):
-        xmin = np.clip(np.floor(box_points[:, 0].min()).astype(np.int), 0, image_width - 1)
-        ymin = np.clip(np.floor(box_points[:, 1].min()).astype(np.int), 0, image_height - 1)
-        xmax = np.clip(np.ceil(box_points[:, 0].max()).astype(np.int), 0, image_width - 1)
-        ymax = np.clip(np.ceil(box_points[:, 1].max()).astype(np.int), 0, image_height - 1)
+        xmin = np.clip(np.floor(box_points[:, 0].min()).astype(np.int32), 0, image_width - 1)
+        ymin = np.clip(np.floor(box_points[:, 1].min()).astype(np.int32), 0, image_height - 1)
+        xmax = np.clip(np.ceil(box_points[:, 0].max()).astype(np.int32), 0, image_width - 1)
+        ymax = np.clip(np.ceil(box_points[:, 1].max()).astype(np.int32), 0, image_height - 1)
         return xmin, ymin, xmax, ymax
     
     
