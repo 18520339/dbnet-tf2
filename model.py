@@ -1,45 +1,36 @@
 # https://github.com/MhLiao/DB/blob/master/decoders/seg_detector.py
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv2D, UpSampling2D, Add, Concatenate, Lambda
+from tensorflow.keras.layers import Input, UpSampling2D, Add, Concatenate, Lambda
 from layers import ConvBnRelu, DeConvMap
 from keras_resnet.models import *
 
 
 class DBNet(tf.keras.Model):
-    def __init__(self, post_processor, backbone='ResNet50', freeze_bn=False, k=50, name='DBNet', **kwargs):
+    def __init__(self, post_processor, backbone='ResNet50', k=50, name='DBNet', **kwargs):
         super().__init__()
-        self.model = self._build_model(backbone, freeze_bn, k, name)
+        self.model = self._build_model(backbone, k, name)
         self.post_processor = post_processor
         
 
-    def _build_model(self, backbone='ResNet50', freeze_bn=False, k=50, name='DBNet'):
+    def _build_model(self, backbone='ResNet50', k=50, name='DBNet'):
         image_input = Input(shape=(None, None, 3), name='image')
-        backbone = eval(f'{backbone}(inputs=image_input, include_top=False, freeze_bn={freeze_bn})')
+        backbone = eval(f'{backbone}(inputs=image_input, include_top=False)')
         
         C2, C3, C4, C5 = backbone.outputs
-        in2 = Conv2D(256, kernel_size=1, use_bias=False, name='in2')(C2)
-        in3 = Conv2D(256, kernel_size=1, use_bias=False, name='in3')(C3)
-        in4 = Conv2D(256, kernel_size=1, use_bias=False, name='in4')(C4)
-        in5 = Conv2D(256, kernel_size=1, use_bias=False, name='in5')(C5)
+        in2 = ConvBnRelu(256, 1, name='in2')(C2)
+        in3 = ConvBnRelu(256, 1, name='in3')(C3)
+        in4 = ConvBnRelu(256, 1, name='in4')(C4)
+        in5 = ConvBnRelu(256, 1, name='in5')(C5)
         
         # The pyramid features are up-sampled to the same scale and cascaded to produce feature F
         out4 = UpSampling2D(2, name='up5')(in5)  + in4
         out3 = UpSampling2D(2, name='up4')(out4) + in3
         out2 = UpSampling2D(2, name='up3')(out3) + in2
         
-        P5 = tf.keras.Sequential([
-            Conv2D(64, kernel_size=3, padding='same', use_bias=False), 
-            UpSampling2D(8) # 1 / 32 * 8 = 1 / 4
-        ], name='P5')(in5)  
-        P4 = tf.keras.Sequential([
-            Conv2D(64, kernel_size=3, padding='same', use_bias=False), 
-            UpSampling2D(4) # 1 / 16 * 4 = 1 / 4
-        ], name='P4')(out4) 
-        P3 = tf.keras.Sequential([
-            Conv2D(64, kernel_size=3, padding='same', use_bias=False), 
-            UpSampling2D(2) # 1 / 8 * 2 = 1 / 4
-        ], name='P3')(out3) 
-        P2 = Conv2D(64, kernel_size=3, padding='same', use_bias=False, name='P2')(out2) # 1 / 4
+        P5 = tf.keras.Sequential([ConvBnRelu(64, 3), UpSampling2D(8)], name='P5')(in5)
+        P4 = tf.keras.Sequential([ConvBnRelu(64, 3), UpSampling2D(4)], name='P4')(out4)
+        P3 = tf.keras.Sequential([ConvBnRelu(64, 3), UpSampling2D(2)], name='P3')(out3)
+        P2 = ConvBnRelu(64, 3, name='P2')(out2)
         
         # Calculate DBNet maps
         fuse = Concatenate(name='fuse')([P2, P3, P4, P5]) # (batch_size, /4, /4, 256)
