@@ -34,7 +34,7 @@ class AnnotationsImporter:
             for idx, line in enumerate(file):
                 annotation = line.rstrip('\n').replace(u'\ufeff', '').split(',') # x1,y1,x2,y2,x3,y3,x4,y4,text
                 try: 
-                    box_points = BoxPointsHandler.order_points([
+                    box_points = BoxPointsHandler.order_points_clockwise([
                         (float(annotation[0]), float(annotation[1])), # (x1, y1)
                         (float(annotation[2]), float(annotation[3])), # (x2, y2)
                         (float(annotation[4]), float(annotation[5])), # (x3, y3)

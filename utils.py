@@ -1,9 +1,6 @@
 import cv2
 import math
-import operator
 import numpy as np
-from functools import reduce
-from scipy.spatial import distance
 
 
 def resize_image_short_side(image, image_short_side=736):
@@ -18,19 +15,17 @@ def resize_image_short_side(image, image_short_side=736):
 
 
 class BoxPointsHandler: # Static class
-    # https://stackoverflow.com/questions/51074984/sorting-according-to-clockwise-point-coordinates#answer-51075698
     @staticmethod
-    def order_points(box_points):
-        center = tuple(map(
-            operator.truediv,
-            reduce(lambda x, y: map(operator.add, x, y), box_points),
-            [len(box_points)] * 2
-        ))
-        sorted_points = sorted(box_points, key=lambda point: (
-            -45 - math.degrees(math.atan2(*tuple(
-                map(operator.sub, point, center)
-            )))) % 360)
-        return np.array(sorted_points, dtype='float32')
+    def order_points_clockwise(box_points):
+        points = np.array(box_points)
+        s = points.sum(axis=1)
+        diff = np.diff(points, axis=1)
+        quad_box = np.zeros((4, 2), dtype=np.float32)
+        quad_box[0] = points[np.argmin(s)]
+        quad_box[2] = points[np.argmax(s)]
+        quad_box[1] = points[np.argmin(diff)]
+        quad_box[3] = points[np.argmax(diff)]
+        return quad_box
 
 
     @staticmethod
