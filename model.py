@@ -39,7 +39,7 @@ class DBNet(tf.keras.Model):
             Conv2D(64, kernel_size=3, padding='same', use_bias=False), 
             UpSampling2D(2) # 1 / 8 * 2 = 1 / 4
         ], name='P3')(out3) 
-        P2 = ConvBnRelu(64, kernel_size=3, name='P2')(out2) # 1 / 4
+        P2 = Conv2D(64, kernel_size=3, padding='same', use_bias=False, name='P2')(out2) # 1 / 4
         
         # Calculate DBNet maps
         fuse = Concatenate(name='fuse')([P2, P3, P4, P5]) # (batch_size, /4, /4, 256)
