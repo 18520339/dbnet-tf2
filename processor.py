@@ -44,7 +44,7 @@ class PostProcessor:
             if self.min_box_score > score: continue
 
             if points.shape[0] > 2:
-                box = self.unclip(points, unclip_ratio=self.unclip_ratio)
+                box = self.unclip(points)
                 if len(box) > 1: continue
             else: continue
             
@@ -95,7 +95,9 @@ class PostProcessor:
 
 
     def get_mini_boxes(self, contour):
-        bounding_box = cv2.minAreaRect(contour)
+        try: bounding_box = cv2.minAreaRect(contour)
+        except: return [], 0
+        
         points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
         index_1, index_2, index_3, index_4 = 0, 1, 2, 3
         
