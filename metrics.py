@@ -26,11 +26,12 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         
         self.images_and_sizes = []
         for image_annotations in self.progressbar(self.true_annotations, unit='image', desc='Reading evaluation images'):
-            raw_image = cv2.imread(image_annotations['image_path'])
-            image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) 
+            image = cv2.imread(image_annotations['image_path'])
+            true_size = image.shape[:2]
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) 
             image = resize_image_short_side(image, image_short_side=image_short_side)
             image = image.astype(np.float32) / 255.0
-            self.images_and_sizes.append((image, raw_image.shape[:2]))
+            self.images_and_sizes.append((image, true_size))
     
     
     def on_train_begin(self, logs=None):
@@ -42,18 +43,9 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
     def on_train_end(self, logs=None):
         print('\nFinal evaluation with the best weights from epoch:', self.best_epoch + 1)
         self.model.set_weights(self.best_weights)
-        self._gather_measure()
+        self._gather_measures()
         
         
-    def on_epoch_begin(self, epoch, logs=None): 
-        self.all_pred_boxes = []
-        self.mean_precision = 0
-        self.mean_recall = 0
-        self.mean_fmeasure = 0
-        self.epoch_true_count = 0
-        self.epoch_pred_count = 0
-        
-
     def on_epoch_end(self, epoch, logs=None):
         current_loss = logs.get('val_loss')
         if np.less(current_loss, self.best_loss):
@@ -62,10 +54,17 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
             self.best_weights = self.model.get_weights() # Record the best weights if current results is better (less).
         
         if (epoch + 1) % self.eval_steps == 0:
-            self._gather_measure()
+            self._gather_measures()
         
-            
-    def _gather_measure(self):
+        
+    def _gather_measures(self):
+        self.all_pred_boxes = []
+        self.mean_precision = 0
+        self.mean_recall = 0
+        self.mean_hmean = 0
+        self.epoch_true_count = 0
+        self.epoch_pred_count = 0
+        
         for image, true_size in self.progressbar(self.images_and_sizes, unit='image', desc='Predicting bounding boxes'):
             batch_boxes, batch_scores = self.model.predict(tf.expand_dims(image, 0), [true_size])
             self.all_pred_boxes.append([
@@ -89,13 +88,13 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         
         self.mean_precision = 0 if self.epoch_pred_count == 0 else self.mean_precision / self.epoch_pred_count
         self.mean_recall = 0 if self.epoch_true_count == 0 else self.mean_recall / self.epoch_true_count
-        if self.mean_precision + self.mean_recall == 0: self.mean_fmeasure = 0
-        else: self.mean_fmeasure = 2 * self.mean_precision * self.mean_recall / (self.mean_precision + self.mean_recall)
+        if self.mean_precision + self.mean_recall == 0: self.mean_hmean = 0
+        else: self.mean_hmean = 2 * self.mean_precision * self.mean_recall / (self.mean_precision + self.mean_recall)
         
         print(f'Average metrics for all evaluation images '
               f'- precision: {self.mean_precision:.4f} '
               f'- recall: {self.mean_recall:.4f} '
-              f'- fmeasure: {self.mean_fmeasure:.4f}')
+              f'- hmean: {self.mean_hmean:.4f}')
     
     
     def get_metrics(self, annotations, pred_boxes):
