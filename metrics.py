@@ -12,7 +12,7 @@ from policies import scoring_policy_compute, MatchingPolicy
 class TedEvalMetric(tf.keras.callbacks.Callback):
     def __init__(
         self, true_annotations, ignore_texts=['###'], min_box_score=0.7, image_short_side=736,
-        area_precision_constraint=0.4, area_recall_constraint=0.4, progressbar=tqdm, level='train'
+        area_precision_constraint=0.4, area_recall_constraint=0.4, progressbar=tqdm, eval_steps=1
     ):
         super().__init__()
         self.true_annotations = true_annotations
@@ -22,24 +22,30 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         self.area_precision_constraint = area_precision_constraint
         self.area_recall_constraint = area_recall_constraint
         self.progressbar = progressbar 
-            
-        if level == 'epoch':
-            self.on_epoch_begin = self.on_begin
-            self.on_epoch_end = self.on_end
-        elif level == 'train':
-            self.on_train_begin = self.on_begin
-            self.on_train_end = self.on_end
-        else: raise ValueError(f'Invalid "{level}" level for callback. Must be either "epoch" or "train"')
+        self.eval_steps = eval_steps
         
         self.images_and_sizes = []
         for image_annotations in self.progressbar(self.true_annotations, unit='image', desc='Reading evaluation images'):
             raw_image = cv2.imread(image_annotations['image_path'])
             image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) 
             image = resize_image_short_side(image, image_short_side=image_short_side)
+            image = image.astype(np.float32) / 255.0
             self.images_and_sizes.append((image, raw_image.shape[:2]))
+    
+    
+    def on_train_begin(self, logs=None):
+        self.best_epoch = 0
+        self.best_loss = np.Inf  # Initialize the best loss as infinity
+        self.best_weights = None # Store the weights at which the minimum loss occurs
         
         
-    def on_begin(self, arg1, arg2=None): 
+    def on_train_end(self, logs=None):
+        print('\nFinal evaluation with the best weights from epoch:', self.best_epoch + 1)
+        self.model.set_weights(self.best_weights)
+        self._gather_measure()
+        
+        
+    def on_epoch_begin(self, epoch, logs=None): 
         self.all_pred_boxes = []
         self.mean_precision = 0
         self.mean_recall = 0
@@ -48,7 +54,18 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         self.epoch_pred_count = 0
         
 
-    def on_end(self, arg1, arg2=None):
+    def on_epoch_end(self, epoch, logs=None):
+        current_loss = logs.get('val_loss')
+        if np.less(current_loss, self.best_loss):
+            self.best_epoch = epoch
+            self.best_loss = current_loss
+            self.best_weights = self.model.get_weights() # Record the best weights if current results is better (less).
+        
+        if (epoch + 1) % self.eval_steps == 0:
+            self._gather_measure()
+        
+            
+    def _gather_measure(self):
         for image, true_size in self.progressbar(self.images_and_sizes, unit='image', desc='Predicting bounding boxes'):
             batch_boxes, batch_scores = self.model.predict(tf.expand_dims(image, 0), [true_size])
             self.all_pred_boxes.append([
