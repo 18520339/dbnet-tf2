@@ -1,6 +1,7 @@
 import cv2
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def resize_image_short_side(image, image_short_side=736):
@@ -13,6 +14,37 @@ def resize_image_short_side(image, image_short_side=736):
         new_height = int(round(new_width / width * height / 32) * 32)
     return cv2.resize(image, (new_width, new_height))
 
+
+# https://github.com/faustomorales/keras-ocr/blob/master/keras_ocr/tools.py
+def draw_predictions(raw_image, boxes, scores, figsize=(15, 7)):
+    plt.figure(figsize=figsize)
+    image = raw_image.copy()
+    predictions = sorted(zip(boxes, scores), key=lambda pred: pred[0][:, 1].min())
+    left, right = [], []
+    
+    for box, score in predictions:
+        if box[:, 0].min() < image.shape[1] / 2: left.append((box, score))
+        else: right.append((box, score))
+        cv2.polylines(image, box[np.newaxis], color=(0, 255, 0), thickness=2, isClosed=True)
+    plt.imshow(image)
+    
+    for side, group in zip(['left', 'right'], [left, right]):
+        for index, (box, score) in enumerate(group):
+            y = 1 - (index / len(group))
+            xy = box[0] / np.array([image.shape[1], image.shape[0]])
+            xy[1] = 1 - xy[1]
+            plt.annotate(
+                text = f'{score:.4f}',
+                xy = xy,
+                xytext = (-0.05 if side == 'left' else 1.05, y),
+                xycoords = 'axes fraction',
+                arrowprops = {'arrowstyle': '->', 'color': 'r'},
+                color = 'r',
+                fontsize = 14,
+                horizontalalignment = 'right' if side == 'left' else 'left',
+            )
+    plt.axis('off')
+            
 
 class BoxPointsHandler: # Static class
     @staticmethod
