@@ -3,7 +3,7 @@ import tensorflow.keras.backend as K
 
 
 class DBLoss(tf.keras.losses.Loss):
-    def __init__(self, alpha=1.0, beta=10.0, negative_ratio=3.0, name='DBLoss', **kwargs):
+    def __init__(self, alpha=5.0, beta=10.0, negative_ratio=3.0, name='DBLoss', **kwargs):
         super(DBLoss, self).__init__(name=name, **kwargs)
         self.alpha = alpha
         self.beta = beta
