@@ -52,7 +52,7 @@ class TedEvalMetric(tf.keras.callbacks.Callback):
         
     def on_epoch_end(self, epoch, logs=None):
         current_loss = logs.get('val_loss')
-        if self.eval_best_weights and np.less(current_loss, self.best_loss):
+        if np.less(current_loss, self.best_loss):
             self.best_epoch = epoch
             self.best_loss = current_loss
             self.best_weights = self.model.get_weights() # Record the best weights if current results is better (less).
