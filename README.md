@@ -1,5 +1,5 @@
 # TFDBNet
-A TensorFlow 2 reimplementation of [Real-time Scene Text Detection with Differentiable Binarization](https://arxiv.org/abs/1911.08947) available as a Python package and using [TedEval](https://github.com/clovaai/TedEval) as evaluation metrics. 
+A TensorFlow 2 reimplementation of [Real-time Scene Text Detection with Differentiable Binarization](https://arxiv.org/abs/1911.08947) available as a Python package and using [TedEval](https://github.com/clovaai/TedEval) for evaluation metrics. 
 
 ## Data Preparation
 ![](./demo/preparation.png)
@@ -34,7 +34,8 @@ Below is the content of `./datasets/train/train_gts/gt_img_1.txt`:
 ```
 pip install tfdbnet
 ```
-After above installation, see the [demo](demo/demo.ipynb) on ICDAR 2015 dataset to know how to use
+After installation, see the [demo](demo/demo.ipynb) on ICDAR 2015 dataset to know how to use. You can download my example trained weights along with the 2 files `train.txt` and `validate.txt` mentioned above [here](https://drive.google.com/file/d/1rLZiOTwlWtnq_a0v_oa0_2tSg7Mt1CUF).
+
 ![](/demo/demo.png)
 
 ## Reference
