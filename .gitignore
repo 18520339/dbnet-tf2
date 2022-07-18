@@ -1,4 +1,6 @@
 __pycache__/
 .ipynb_checkpoints
+dist
+tfdbnet.egg-info
 Datasets
 *.h5
